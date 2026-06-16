@@ -1,0 +1,47 @@
+name: Reusable KAS Check
+
+on:
+  workflow_call:
+    inputs:
+      checkout_ref:
+        description: 'Git ref to check out'
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+env:
+  KAS_CONTAINER: ghcr.io/siemens/kas/kas:4.6
+
+jobs:
+  check:
+    name: Check ${{ matrix.kas_config }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        kas_config:
+          - kas/hailo15-ne503.yml
+          - kas/hailo15-sbc.yml
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          path: src
+          ref: ${{ inputs.checkout_ref || github.ref }}
+
+      - name: Validate KAS config
+        run: |
+          docker run --rm \
+            --user=root \
+            -v "${{ github.workspace }}/src:/repo:rw" \
+            -w /repo \
+            -e USER_ID="$(id -u)" \
+            -e GROUP_ID="$(id -g)" \
+            "${KAS_CONTAINER}" \
+            dump "${{ matrix.kas_config }}" >/dev/null

@@ -1,0 +1,75 @@
+DESCRIPTION = "CamThink AIPC Platform Software (Go + C++)"
+LICENSE = "CLOSED"
+LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/CLOSED;md5=xxx"
+
+SRC_URI = "git://github.com/your-org/camthink-aipc.git;protocol=https;branch=main"
+SRCREV = "${AUTOREV}"
+
+S = "${WORKDIR}/git"
+B = "${WORKDIR}/build"
+
+inherit cmake goarch
+
+DEPENDS = " \
+    go-native \
+    virtual/${TUNE_PKGARCH}-go \
+    go-runtime \
+    libhailort \
+    libmedialib \
+"
+
+# Go 配置
+export CGO_ENABLED = "1"
+export GOOS = "${TARGET_GOOS}"
+export GOARCH = "${TARGET_GOARCH}"
+export GOROOT = "${STAGING_LIBDIR}/go"
+export GOPATH = "${B}/go"
+export GOCACHE = "${B}/.gocache"
+export GOMODCACHE = "${TMPDIR}/go-mod-cache"
+
+# CMake 配置
+EXTRA_OECMAKE = " \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DGO_BUILD_ENABLED=ON \
+    -DGO_COMPILER=${STAGING_BINDIR_NATIVE}/go \
+    -DCGO_ENABLED=1 \
+"
+
+# 并行构建
+PARALLEL_MAKE = "-j${@oe.utils.cpu_count()}"
+CMAKE_BUILD_PARALLEL_LEVEL = "${@oe.utils.cpu_count()}"
+GO_PARALLEL_BUILD = "-p ${@oe.utils.cpu_count()}"
+
+do_configure:prepend() {
+    # 确保 Go 工具链在 PATH 中
+    export PATH="${STAGING_BINDIR_NATIVE}:$PATH"
+    
+    # 创建 Go module 缓存目录
+    mkdir -p ${GOMODCACHE}
+    
+    # 预下载 Go 依赖（加速后续构建）
+    if [ -f "${S}/go.mod" ]; then
+        cd ${S}
+        ${STAGING_BINDIR_NATIVE}/go mod download
+    fi
+}
+
+do_install() {
+    # 安装二进制文件
+    install -d ${D}${bindir}
+    if [ -f "${B}/camthink-cpp" ]; then
+        install -m 0755 ${B}/camthink-cpp ${D}${bindir}/
+    fi
+    if [ -f "${B}/camthink-go" ]; then
+        install -m 0755 ${B}/camthink-go ${D}${bindir}/
+    fi
+    
+    # 安装配置文件
+    if [ -d "${S}/config" ]; then
+        install -d ${D}${sysconfdir}/camthink
+        install -m 0644 ${S}/config/*.conf ${D}${sysconfdir}/camthink/ 2>/dev/null || true
+    fi
+}
+
+FILES:${PN} += "${sysconfdir}/camthink/*"
+

@@ -1,0 +1,34 @@
+diff --git a/board/hailo/common/hailo15_board.c b/board/hailo/common/hailo15_board.c
+index 4ea54f7735..36abd831c3 100644
+--- a/board/hailo/common/hailo15_board.c
++++ b/board/hailo/common/hailo15_board.c
+@@ -25,6 +25,7 @@
+ #include <net.h>
+ #include <scmi_hailo_protocol.h>
+ #include <linux/libfdt.h>
++#include <fdt_support.h>
+ 
+ #define MAC_ADDR_LEN 6
+ DECLARE_GLOBAL_DATA_PTR;
+@@ -548,6 +549,21 @@ static void disable_hailo_cma(void *fdt)
+ 
+ void board_fixup_fdt_reserved_mem(void *fdt)
+ {
++    /*
++	 * Keep Linux /memory in sync with probed DRAM size.
++	 *
++	 * On this platform DRAM size is detected in U-Boot (gd->ram_size is set in
++	 * dram_init()), while the kernel DTB bundled inside the FIT may have a
++	 * fixed /memory/reg. Update it here so the same FIT/DTB works for 4G/8G
++	 * variants (and also reflects ECC "usable" size when applicable).
++	 */
++	if (gd && gd->ram_size) {
++		int ret = fdt_fixup_memory(fdt, (u64)PHYS_SDRAM_1,
++					   (u64)gd->ram_size);
++		if (ret)
++			printf("Warning: failed to fixup /memory/reg: %s\n",
++			       fdt_strerror(ret));
++	}
+     if (env_get_yesno("shrink_cma") == 1) {
+         fixup_linux_cma_size(fdt, 32UL * SZ_1M);
+         disable_hailo_cma(fdt);

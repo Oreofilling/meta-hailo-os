@@ -1,0 +1,14 @@
+header:
+  version: 11
+
+repos:
+  meta-virtualization:
+    url: "https://git.yoctoproject.org/meta-virtualization"
+    commit: c474ae21b11a816be607eb7b44d2cf77d1125bce
+    layers:
+      .:
+
+  meta-hailo-camthink:
+    path: meta-hailo-camthink
+    layers:
+      .: .

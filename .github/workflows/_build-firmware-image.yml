@@ -1,0 +1,204 @@
+name: Reusable Firmware Build
+
+on:
+  workflow_call:
+    inputs:
+      kas_config:
+        description: 'KAS config to build'
+        required: false
+        type: string
+        default: 'kas/hailo15-ne503.yml'
+      checkout_ref:
+        description: 'Git ref to check out'
+        required: false
+        type: string
+        default: ''
+      upload_artifact:
+        description: 'Upload firmware image artifact'
+        required: false
+        type: boolean
+        default: true
+      artifact_suffix:
+        description: 'Suffix for uploaded artifact name'
+        required: false
+        type: string
+        default: ''
+    outputs:
+      artifact_name:
+        description: 'Uploaded firmware artifact name'
+        value: ${{ jobs.build.outputs.artifact_name }}
+      machine:
+        description: 'Resolved Yocto machine name'
+        value: ${{ jobs.build.outputs.machine }}
+
+permissions:
+  contents: read
+
+env:
+  KAS_CONTAINER: ghcr.io/siemens/kas/kas:4.6
+
+jobs:
+  build:
+    name: Build firmware image
+    runs-on: [self-hosted, Linux, yocto]
+    timeout-minutes: 720
+
+    outputs:
+      artifact_name: ${{ steps.artifact.outputs.name }}
+      machine: ${{ steps.machine.outputs.name }}
+
+    defaults:
+      run:
+        working-directory: src
+
+    env:
+      CHECKOUT_PATH: src
+      KAS_CONFIG: ${{ inputs.kas_config }}
+      SSTATE_DIR: ${{ github.workspace }}/yocto-cache/sstate
+      DL_DIR: ${{ github.workspace }}/yocto-cache/downloads
+      KAS_WORK_DIR: ${{ github.workspace }}/yocto-cache/kas-work
+      FIRMWARE_ARTIFACTS_DIR: ${{ github.workspace }}/firmware-artifacts
+      PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          path: src
+          ref: ${{ inputs.checkout_ref || github.ref }}
+
+      - name: Prepare Yocto directories
+        working-directory: ${{ github.workspace }}
+        run: |
+          mkdir -p "${SSTATE_DIR}" "${DL_DIR}" "${KAS_WORK_DIR}/build"
+
+      - name: Check inotify limits
+        run: |
+          watches="$(sysctl -n fs.inotify.max_user_watches)"
+          instances="$(sysctl -n fs.inotify.max_user_instances)"
+          echo "fs.inotify.max_user_watches=${watches}"
+          echo "fs.inotify.max_user_instances=${instances}"
+          if [ "$watches" -lt 524288 ] || [ "$instances" -lt 1024 ]; then
+            echo "::error::Inotify limits are too low for BitBake. On the self-hosted runner, run: sudo sysctl -w fs.inotify.max_user_watches=1048576 fs.inotify.max_user_instances=8192"
+            exit 1
+          fi
+
+      - name: Print build context
+        run: |
+          echo "KAS_CONFIG=${KAS_CONFIG}"
+          echo "KAS_WORK_DIR=${KAS_WORK_DIR}"
+          echo "SSTATE_DIR=${SSTATE_DIR}"
+          echo "DL_DIR=${DL_DIR}"
+          docker --version
+          df -h "${KAS_WORK_DIR}" "${SSTATE_DIR}" "${DL_DIR}" || true
+
+      - name: Resolve machine name
+        id: machine
+        run: |
+          config_base="$(basename "${KAS_CONFIG}" .yml)"
+          machine_file="kas/${config_base}-machine.yml"
+          machine="$(awk '/^machine:/{print $2; exit}' "$machine_file" 2>/dev/null || true)"
+          if [ -z "$machine" ] || [ "$machine" = "unset" ]; then
+            echo "Could not read machine from ${machine_file}" >&2
+            exit 1
+          fi
+          echo "name=${machine}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build firmware with KAS
+        working-directory: ${{ github.workspace }}
+        run: |
+          docker run --rm --init \
+            --user=root \
+            -v "${{ github.workspace }}/${CHECKOUT_PATH}:/repo:rw" \
+            -v "${KAS_WORK_DIR}:/work:rw" \
+            -v "${{ github.workspace }}/${CHECKOUT_PATH}/meta-hailo-camthink:/work/meta-hailo-camthink:ro" \
+            -v "${KAS_WORK_DIR}/build:/build:rw" \
+            -v "${SSTATE_DIR}:/sstate:rw" \
+            -v "${DL_DIR}:/downloads:rw" \
+            -w /repo \
+            -e KAS_WORK_DIR=/work \
+            -e KAS_BUILD_DIR=/build \
+            -e USER_ID="$(id -u)" \
+            -e GROUP_ID="$(id -g)" \
+            -e SSTATE_DIR=/sstate \
+            -e DL_DIR=/downloads \
+            -e BB_NUMBER_THREADS="$(nproc)" \
+            -e PARALLEL_MAKE="-j$(nproc)" \
+            "${KAS_CONTAINER}" \
+            build "/repo/${KAS_CONFIG}"
+
+      - name: Create image manifest
+        run: |
+          image_dir="${KAS_WORK_DIR}/build/tmp/deploy/images/${{ steps.machine.outputs.name }}"
+          if [ ! -d "$image_dir" ]; then
+            echo "Image directory not found: ${image_dir}" >&2
+            exit 1
+          fi
+          {
+            echo "Image directory: ${image_dir}"
+            echo
+            ls -lah "$image_dir"
+          } | tee image-manifest.txt
+
+      - name: Stage documented firmware artifacts
+        run: |
+          image_dir="${KAS_WORK_DIR}/build/tmp/deploy/images/${{ steps.machine.outputs.name }}"
+          machine="${{ steps.machine.outputs.name }}"
+          rm -rf "${FIRMWARE_ARTIFACTS_DIR}"
+          mkdir -p "${FIRMWARE_ARTIFACTS_DIR}"
+
+          required_files="
+          hailo15_uart_recovery_fw.bin
+          hailo15_scu_bl.bin
+          scu_bl_cfg_a.bin
+          hailo15_scu_fw.bin
+          u-boot.dtb.signed
+          u-boot-spl.bin
+          u-boot-initial-env
+          customer_certificate.bin
+          u-boot-tfa.itb
+          fitImage
+          swupdate-image-${machine}.ext4.gz
+          hailo-update-image-${machine}.swu
+          "
+
+          for file in $required_files; do
+            if [ ! -e "${image_dir}/${file}" ]; then
+              echo "Required firmware artifact not found: ${image_dir}/${file}" >&2
+              exit 1
+            fi
+            cp -L "${image_dir}/${file}" "${FIRMWARE_ARTIFACTS_DIR}/"
+          done
+
+          cp image-manifest.txt "${FIRMWARE_ARTIFACTS_DIR}/"
+          ls -lah "${FIRMWARE_ARTIFACTS_DIR}"
+
+      - name: Set artifact metadata
+        id: artifact
+        run: |
+          suffix="${{ inputs.artifact_suffix }}"
+          if [ -z "$suffix" ]; then
+            suffix="${GITHUB_SHA}"
+          fi
+          echo "name=firmware-${{ steps.machine.outputs.name }}-${suffix}" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload firmware artifact
+        if: inputs.upload_artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.artifact.outputs.name }}
+          path: |
+            ${{ env.FIRMWARE_ARTIFACTS_DIR }}/*
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs-${{ github.run_id }}
+          path: |
+            ${{ env.KAS_WORK_DIR }}/build/tmp/log/cooker/*/console-latest.log
+            ${{ env.KAS_WORK_DIR }}/build/tmp/work-shared/**/log.do_*
+          retention-days: 7
+          if-no-files-found: warn

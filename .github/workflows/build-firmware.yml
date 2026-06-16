@@ -1,0 +1,46 @@
+name: Build Firmware
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'kas/**'
+      - 'meta-hailo-camthink/**'
+      - '.github/workflows/**'
+  workflow_dispatch:
+    inputs:
+      kas_config:
+        description: 'KAS config to build'
+        required: true
+        type: choice
+        default: 'kas/hailo15-ne503.yml'
+        options:
+          - kas/hailo15-ne503.yml
+          - kas/hailo15-sbc.yml
+      upload_artifacts:
+        description: 'Upload firmware image artifacts'
+        required: true
+        type: boolean
+        default: true
+
+concurrency:
+  group: firmware-build-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    uses: ./.github/workflows/_check-kas.yml
+    with:
+      checkout_ref: ${{ github.ref }}
+
+  build:
+    needs: check
+    uses: ./.github/workflows/_build-firmware-image.yml
+    with:
+      checkout_ref: ${{ github.ref }}
+      kas_config: ${{ inputs.kas_config || 'kas/hailo15-ne503.yml' }}
+      upload_artifact: ${{ github.event_name == 'workflow_dispatch' && inputs.upload_artifacts }}

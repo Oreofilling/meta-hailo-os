@@ -1,0 +1,24 @@
+name: Check Firmware
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'kas/**'
+      - 'meta-hailo-camthink/**'
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+concurrency:
+  group: firmware-check-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    uses: ./.github/workflows/_check-kas.yml
+    with:
+      checkout_ref: ${{ github.ref }}

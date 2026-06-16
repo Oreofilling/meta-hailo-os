@@ -1,0 +1,52 @@
+[Unit]
+Description=ISP Media Server
+Description=Verisilicon ISP Media Server for Hailo imaging subsystem
+After=multi-user.target
+Wants=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/usr/bin
+
+# Environment variables for configuration
+# Default values matching SysVinit script defaults
+Environment="EBASE_TRACE_LEVEL=trace_off"
+Environment="ALOG_LEVEL=warning"
+Environment="ALOG_TAGS="
+
+# Usage examples:
+# Start with default values:
+#   systemctl start isp_media_server
+# Start with custom ALOG level:
+#   ALOG_LEVEL=debug systemctl start isp_media_server
+# Start with custom TRACE level:
+#   EBASE_TRACE_LEVEL=info systemctl start isp_media_server
+# Start with custom ALOG tags:
+#   ALOG_TAGS=Aeev1,ALsc systemctl start isp_media_server
+# Start with all custom values:
+#   EBASE_TRACE_LEVEL=info ALOG_LEVEL=debug ALOG_TAGS=sensor systemctl start isp_media_server
+
+# Build command with optional ALOG_TAGS
+# If ALOG_TAGS is set, pass it as second argument; otherwise only pass ALOG_LEVEL
+ExecStart=/bin/sh -c 'if [ -n "$ALOG_TAGS" ]; then exec isp_media_server "$ALOG_LEVEL" "$ALOG_TAGS"; else exec isp_media_server "$ALOG_LEVEL"; fi'
+
+# Stop the service gracefully
+ExecStop=/bin/kill -TERM $MAINPID
+KillMode=process
+KillSignal=SIGTERM
+
+# Timeout settings
+TimeoutStartSec=30
+TimeoutStopSec=10
+
+# Restart policy
+Restart=on-failure
+RestartSec=5
+
+# Logging
+StandardOutput=journal+console
+StandardError=journal+console
+SyslogIdentifier=isp_media_server
+
+[Install]
+WantedBy=multi-user.target

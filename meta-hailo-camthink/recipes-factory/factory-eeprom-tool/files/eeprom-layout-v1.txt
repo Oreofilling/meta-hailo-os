@@ -1,0 +1,87 @@
+================================================================================
+NE503 / AT24C02 — Factory EEPROM binary layout v1 (dual-slot A/B, fixed fields)
+Total size: 256 bytes (0x0000 .. 0x00FF)
+Slot count: 2 (A and B), each 128 bytes
+Endianness: little-endian for multi-byte numeric fields on CPU (ARM).
+Unused / reserved bytes: program as 0xFF (erased EEPROM convention).
+================================================================================
+
+1. OVERVIEW (A/B slots)
+
+  Slot A: 0x0000 .. 0x007F
+  Slot B: 0x0080 .. 0x00FF
+
+  Boot / firmware selection rule:
+    - Validate A and B independently (magic/version/crc).
+    - If both valid, choose the slot with larger seq.
+    - If only one valid, use the valid one.
+    - If neither valid, treat EEPROM as unprogrammed.
+
+  Factory write rule (power-fail safe):
+    - Read current valid slot (if any), apply updates in RAM.
+    - Write the *other* slot fully (128 bytes), then verify.
+    - On success, the new slot wins by having seq = old_seq + 1.
+
+2. SLOT FORMAT (applies to both A and B)
+
+  2.1 Slot header (16 bytes, fixed)
+
+    Offset  Size  Field
+    ------  ----  -----
+    +0x00     4   magic           ASCII "CTFB" (0x43 54 46 42)
+    +0x04     1   layout_version  0x01 for this document
+    +0x05     1   flags           bitmask (see §4)
+    +0x06     2   crc16           CRC-16/CCITT-FALSE over slot payload (§3)
+    +0x08     4   seq             monotonically increasing counter (u32 LE)
+    +0x0C     4   reserved0       0xFF (future use)
+
+  2.2 Slot payload (112 bytes, fixed-field region)
+
+    Offset  Size  Field
+    ------  ----  -----
+    +0x10     6   mac_bin         IEEE EUI-48, high-order byte first
+                                 [0]=octet0 .. [5]=octet5 (wire order)
+    +0x16     2   reserved1       0xFF
+    +0x18    32   sn_ascii        Serial number, ASCII (0xFF padded)
+    +0x38    16   pn_ascii        PN/SKU (ASCII, 0xFF padded)
+    +0x48     8   batch_ascii     Lot/batch id (ASCII, 0xFF padded)
+    +0x50     8   hw_rev_ascii    Hardware revision (ASCII, 0xFF padded)
+    +0x58    24   reserved_tail   0xFF (future expansion within slot)
+
+3. CRC COVERAGE (per-slot)
+
+  CRC algorithm: CRC-16/CCITT-FALSE
+    - polynomial: 0x1021
+    - init:       0xFFFF
+    - refin/refout/xorout: none (CCITT-FALSE)
+    - process each byte MSbit first
+
+  Compute CRC over slot payload bytes [+0x10, +0x7F] inclusive (112 bytes).
+  Do NOT include slot header bytes [+0x00, +0x0F] in the CRC input stream.
+
+  Store CRC at header +0x06..+0x07 as UINT16 LE:
+    +0x06 = low byte, +0x07 = high byte.
+
+4. FLAGS BYTE (header +0x05)
+
+  bit0 (0x01) FACTORY_PROGRAMMED  — payload + CRC written and verified once
+  bit1 (0x02) MAC_VALID           — mac_bin is valid (optional mirror of content check)
+  bit2..7       reserved           — must be 0 when programmed; treat as 0 when reading v1
+
+5. TEXT FIELD RULES (SN, PN, batch, hw_rev)
+
+  - Printable ASCII preferred [0x20..0x7E].
+  - No embedded NUL required; readers SHOULD trim trailing 0xFF and trim spaces.
+  - Maximum usable characters = field size; longer strings are truncated by writer.
+
+6. MAC BINARY (payload +0x10..+0x15)
+
+  Example MAC 00:11:22:33:44:55 stored as bytes:
+    mac_bin[0]=0x00 mac_bin[1]=0x11 mac_bin[2]=0x22
+    mac_bin[3]=0x33 mac_bin[4]=0x44 mac_bin[5]=0x55
+
+  Unprogrammed: all 0xFF.
+
+================================================================================
+Document: eeprom-layout-v1.txt | Layout ID: CTFB v1 A/B | Wire EEPROM: AT24C02 256B
+================================================================================

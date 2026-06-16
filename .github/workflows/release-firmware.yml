@@ -1,0 +1,75 @@
+name: Release Firmware
+
+on:
+  push:
+    tags:
+      - 'v*'
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag to build and publish'
+        required: true
+        type: string
+      kas_config:
+        description: 'KAS config to build'
+        required: true
+        type: choice
+        default: 'kas/hailo15-ne503.yml'
+        options:
+          - kas/hailo15-ne503.yml
+          - kas/hailo15-sbc.yml
+
+concurrency:
+  group: firmware-release-${{ github.event.release.tag_name || inputs.tag_name || github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    uses: ./.github/workflows/_check-kas.yml
+    with:
+      checkout_ref: ${{ github.event.release.tag_name || inputs.tag_name || github.ref }}
+
+  build:
+    needs: check
+    uses: ./.github/workflows/_build-firmware-image.yml
+    with:
+      checkout_ref: ${{ github.event.release.tag_name || inputs.tag_name || github.ref }}
+      kas_config: ${{ inputs.kas_config || 'kas/hailo15-ne503.yml' }}
+      upload_artifact: true
+      artifact_suffix: ${{ github.event.release.tag_name || inputs.tag_name || github.ref_name }}
+
+  publish:
+    name: Publish firmware release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download firmware artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.artifact_name }}
+          path: release-assets
+
+      - name: Create checksums
+        run: |
+          cd release-assets
+          find . -maxdepth 1 -type f ! -name SHA256SUMS -printf '%P\0' \
+            | sort -z \
+            | xargs -0 sha256sum > SHA256SUMS
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.release.tag_name || inputs.tag_name || github.ref_name }}
+          files: release-assets/*
+          generate_release_notes: true

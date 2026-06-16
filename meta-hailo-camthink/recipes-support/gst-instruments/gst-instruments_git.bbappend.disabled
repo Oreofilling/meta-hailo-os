@@ -1,0 +1,12 @@
+# Fix for undefined symbol: for_each_buffer
+# This plugin has compatibility issues with GStreamer 1.20.7
+# The symbol 'for_each_buffer' is not available in the current GStreamer version
+# Since gst-instruments is only used for profiling/debugging and is optional,
+# we remove it to avoid runtime warnings
+
+do_install:append() {
+    # Remove the problematic plugin to avoid runtime warnings
+    # The plugin is optional and only used for GStreamer pipeline profiling
+    rm -f ${D}${libdir}/gstreamer-1.0/libgstinstruments.so
+}
+
