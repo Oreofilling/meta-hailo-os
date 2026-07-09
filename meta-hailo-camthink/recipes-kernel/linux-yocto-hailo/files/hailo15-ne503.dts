@@ -127,6 +127,10 @@
 	broken-cd;
 	sd-vsel-gpio = <&gpio1 1 GPIO_ACTIVE_HIGH>;
 	sd-vsel-polarity-high;
+	sdhci-caps = <0x00000000 0x01000000>;
+	/* Force VOLT33, disable UHS modes, and cap clock for stable operation */
+	sdhci-caps-mask = <0x00000007 0x00000000>;
+	max-frequency = <25000000>;
 	phy-config {
 		card-is-emmc = <0x0>;
 		cmd-pad-values = <0x1 0x3 0x1 0x1>;
