@@ -228,7 +228,8 @@ index 804d30c2..3a79c960 100644
 @@ -56,9 +60,9 @@
      "setup_swupdate_update_filename=setenv swupdate_update_filename hailo-update-image-${board}.swu\0" \
      "setup_swupdate_server_ip=if test -z \"${swupdate_server_ip}\"; then setenv swupdate_server_ip ${serverip}; fi; true\0" \
-     "swupdate_update_modes=init-partitions-single,init-scu-bl,copy-a\0" \
+-    "swupdate_update_modes=init-partitions-single,init-scu-bl,copy-a\0" \
++    "swupdate_update_modes=init-partitions-dual,init-scu-bl,copy-a\0" \
 -    "append_bootargs_swupdate_server=setenv bootargs ${bootargs} SWUPDATE_SERVER_IP=${swupdate_server_ip} SWUPDATE_IPADDR=${ipaddr}\0" \
 -    "append_bootargs_swupdate_params=setenv bootargs ${bootargs} SWUPDATE_SERVER_UDP_LOGGING_PORT=${swupdate_server_udp_logging_port} SWUPDATE_UPDATE_FILENAME=${swupdate_update_filename} SWUPDATE_UPDATE_MODES=${swupdate_update_modes}\0" \
 -    "append_bootargs_swupdate_device=setenv bootargs ${bootargs} ${bootargs_swupdate_device}\0" \

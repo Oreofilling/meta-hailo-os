@@ -154,11 +154,15 @@ On power-up, use the serial console to open the U-Boot menu and pick a mode:
 | **Boot from NFS** | Boot with kernel/rootfs over the network (NFS); requires host NFS export and matching `ipaddr` / `serverip`. |
 | **SD Card Board Init** | **First-time / factory-style install:** provision a single system image onto SD (SWUpdate flow from TFTP as configured). |
 | **SD Card AB Board Init** | Install an A/B redundant system onto SD. |
-| **eMMC Board Init** | **First-time / factory-style install:** provision a single system onto eMMC (typical for production boards). |
-| **eMMC AB Board Init** | Install an A/B redundant system onto eMMC. |
+| **eMMC Board Init** | On this NE503 layer the default update modes are forced to the dual-copy layout for compatibility with web OS upgrades. |
+| **eMMC AB Board Init** | **Required factory/recovery mode:** install the A/B redundant layout used by AIPC OS upgrades. |
 | **U-Boot console** | Interactive shell: `setenv`, manual `boot`, TFTP/NFS tweaks, diagnostics. |
 
-Start flashing firmware to eMMC，choose **"eMMC Board Init"**
+Start flashing firmware to eMMC and choose **"eMMC AB Board Init"**. This
+creates `p1/p2` for copy A, `p3/p4` for copy B, and persistent data on `p5`.
+The AIPC OS updater supports the legacy `p1/p2/p3` layout through a rebooted
+local-recovery flow, but it cannot provide automatic rollback. New factory
+devices should use the A/B layout.
 
 ### 4.3 Network addresses (optional)
 
