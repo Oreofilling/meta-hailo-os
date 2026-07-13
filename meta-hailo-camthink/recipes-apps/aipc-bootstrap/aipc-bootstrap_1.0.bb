@@ -90,8 +90,8 @@ do_install() {
     printf '{\n' > ${D}${RECOVERY_DIR}/manifest.json
     printf '  "format": 1,\n' >> ${D}${RECOVERY_DIR}/manifest.json
     printf '  "machine": "%s",\n' "${MACHINE}" >> ${D}${RECOVERY_DIR}/manifest.json
-    printf '  "bsp_version": "%s",\n' "${OS_VERSION}" >> ${D}${RECOVERY_DIR}/manifest.json
-    printf '  "recovery_version": "%s",\n' "${OS_VERSION}" >> ${D}${RECOVERY_DIR}/manifest.json
+    printf '  "bsp_version": "%s",\n' "$OS_VERSION" >> ${D}${RECOVERY_DIR}/manifest.json
+    printf '  "recovery_version": "%s",\n' "$OS_VERSION" >> ${D}${RECOVERY_DIR}/manifest.json
     printf '  "local_update_protocol": "AIPC_LOCAL_RECOVERY_V1",\n' >> ${D}${RECOVERY_DIR}/manifest.json
     printf '  "secure_boot_key_id": "",\n' >> ${D}${RECOVERY_DIR}/manifest.json
     printf '  "fit_image": {\n' >> ${D}${RECOVERY_DIR}/manifest.json

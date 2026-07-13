@@ -76,6 +76,17 @@ mount_persistent_data() {
     mount "$data_partition" /data || recovery_shell "data-mount-failed"
 }
 
+safe_forced_reboot() {
+    sync
+    if awk '$2 == "/data" { found=1 } END { exit !found }' /proc/mounts; then
+        umount /data 2>/dev/null ||
+            mount -o remount,ro /data 2>/dev/null ||
+            true
+    fi
+    sync
+    reboot -f
+}
+
 run_local_update() {
     relative_path="${SWUPDATE_UPDATE_FILENAME#local:}"
     case "$relative_path" in
@@ -113,8 +124,7 @@ run_local_update() {
     fi
     rm -f "${JOB_DIR}/recovery.failed"
     echo "ok" >"${JOB_DIR}/recovery.success"
-    sync
-    reboot -f
+    safe_forced_reboot
     recovery_shell "reboot-returned"
 }
 
@@ -152,8 +162,7 @@ run_tftp_update() {
     if [ "$rc" -ne 0 ]; then
         recovery_shell "tftp-update-exit-${rc}"
     fi
-    sync
-    reboot -f
+    safe_forced_reboot
     recovery_shell "reboot-returned"
 }
 

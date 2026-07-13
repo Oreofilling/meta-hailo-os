@@ -11,6 +11,10 @@ SRC_URI:append:hailo15-ne503 = " file://aipc-require-current-root.sh"
 python aipc_validate_current_root_contract() {
     import os
 
+    src_uri = d.getVar("SRC_URI") or ""
+    if "aipc-require-current-root.sh" not in src_uri:
+        return
+
     path = os.path.join(d.getVar("WORKDIR"), "aipc-require-current-root.sh")
     try:
         with open(path, "r", encoding="utf-8") as stream:

@@ -70,6 +70,7 @@ fi
 
 # Door 3 (in policy): copy + enable only. Never destructive.
 promoted=0
+copied_units=()
 start_units=()
 for unit in "${units[@]}"; do
     name="$(basename -- "$unit")"
@@ -77,15 +78,21 @@ for unit in "${units[@]}"; do
         warn "failed to copy $name; skipping"
         continue
     fi
+    copied_units+=("$name")
+    promoted=$((promoted + 1))
+done
+
+if [ "$promoted" -gt 0 ] && ! systemctl daemon-reload; then
+    warn "systemctl daemon-reload failed; continuing with best-effort enable"
+fi
+
+for name in "${copied_units[@]}"; do
     # Idempotent enable: don't re-run enable on units already enabled.
     if ! systemctl is-enabled --quiet "$name" 2>/dev/null; then
         systemctl enable "$name" 2>/dev/null || warn "failed to enable $name (will retry next boot)"
     fi
     start_units+=("$name")
-    promoted=$((promoted + 1))
 done
-
-systemctl daemon-reload
 
 # Systemd does not dynamically start newly enabled .wants/ dependencies if the
 # target is already active or in the queue. Explicitly queue them now.

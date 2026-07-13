@@ -1,5 +1,4 @@
 [Unit]
-Description=ISP Media Server
 Description=Verisilicon ISP Media Server for Hailo imaging subsystem
 After=network.target
 Wants=network.target
