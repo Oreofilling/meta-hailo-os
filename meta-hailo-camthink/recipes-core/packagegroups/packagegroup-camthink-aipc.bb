@@ -18,6 +18,8 @@ RDEPENDS:${PN}-system = " \
     docker \
     python3-docker-compose \
     factory-eeprom-tool \
+    u-boot-fw-utils \
+    aipc-bootstrap \
 "
 
 # Part 2: CamThink AIPC application
@@ -30,4 +32,3 @@ RDEPENDS:${PN} = " \
     ${PN}-system \
     ${PN}-app \
 "
-

@@ -16,4 +16,4 @@ repos:
   meta-hailo-camthink:
     path: meta-hailo-camthink
     layers:
-      .: .
+      .:

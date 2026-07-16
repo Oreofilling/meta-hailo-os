@@ -1,6 +1,11 @@
 software =
 {
-	version = "1.12.0"
+	version = "1.12.0";
+	build-time = "@@AIPC_BUILD_TIME@@";
+	product = "ne503";
+	aipc-compat-level = "1";
+	data-schema = "1";
+	min-recovery-version = "1.0.1";
 	description = "Firmware update for Hailo SoC";
 	hardware-compatibility: [ "1.0"];
 	embedded-script = "
@@ -108,6 +113,10 @@ end
 			);
 			scripts: (
 				{
+					filename = "aipc-require-current-root.sh";
+					type = "preinstall";
+				},
+				{
 					filename = "resize_fs.sh";
 					type = "postinstall";
 					data = "/dev/${FILESYSTEM_DEVICE}p2";
@@ -185,6 +194,10 @@ end
 				},
 			);
 			scripts: (
+				{
+					filename = "aipc-require-current-root.sh";
+					type = "preinstall";
+				},
 				{
 					filename = "resize_fs.sh";
 					type = "postinstall";
@@ -287,4 +300,3 @@ end
 		}
 	}
 }
-

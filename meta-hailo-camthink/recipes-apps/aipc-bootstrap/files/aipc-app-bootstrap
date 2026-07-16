@@ -1,0 +1,104 @@
+#!/bin/bash
+# Generic AIPC boot enabler, owned by the OS image.
+#
+# Runs the application-owned, slot-agnostic current-root installer from /data
+# on first boot. That installer restores units, executable links and application
+# configuration into the fresh rootfs while validating OS-owned compatibility
+# metadata. A unit-only
+# promotion path remains as a transition fallback for packages produced during
+# migration. This launcher contains no business service names or compatibility
+# numbers.
+#
+# Safety doors (never bricks boot — on any failure the OS stays up and SSH-able):
+#   1. A legacy owner=os image bakes aipc-{restore,firstboot,autostart}.service
+#      into /usr/lib/systemd/system. If any is present this slot is already
+#      managed by the OS vendor set -> defer to it, exit 0, touch nothing.
+#   2. /data/aipc/systemd/ missing or empty -> AIPC package not deployed yet
+#      -> log loudly and exit 0 (platform will not start, but this is NOT a
+#      brick: OS SSH is reachable; deploy the AIPC package and reboot).
+#   3. Only ever `enable`/copy. Never `mask`, `disable`, or `remove`.
+#
+# Ordering guarantee (why first boot works): this unit runs
+# `Before=multi-user.target`. The AIPC boot units it promotes are all
+# `WantedBy=multi-user.target`, and `aipc-autostart` then enables the business
+# services. By the time systemd activates multi-user.target, the newly enabled
+# .wants symlinks exist and the unit graph is reloaded, so multi-user pulls the
+# whole AIPC chain in.
+set -u
+
+SRC="/data/aipc/systemd"
+DEST="/etc/systemd/system"
+TAG="aipc-app-bootstrap"
+CURRENT_ROOT_INSTALLER="${AIPC_CURRENT_ROOT_INSTALLER:-/data/aipc/scripts/aipc-install-current-root.sh}"
+
+log()  { echo "[$TAG] $*"; }
+warn() { echo "[$TAG] WARN: $*" >&2; }
+
+# Door 1: legacy owner=os vendor units present -> defer, do not collide.
+for legacy in \
+    /usr/lib/systemd/system/aipc-restore.service \
+    /usr/lib/systemd/system/aipc-firstboot.service \
+    /usr/lib/systemd/system/aipc-autostart.service; do
+    if [ -e "$legacy" ]; then
+        log "legacy vendor unit present ($legacy); deferring boot to OS owner=os set, exiting 0"
+        exit 0
+    fi
+done
+
+# Preferred contract: the application owns reconstruction of every rootfs-local
+# integration point. The OS launcher knows only this stable entry point and no
+# business service names, compatibility levels or configuration file list.
+if [ -x "$CURRENT_ROOT_INSTALLER" ]; then
+    log "executing application current-root installer"
+    exec "$CURRENT_ROOT_INSTALLER"
+fi
+
+warn "$CURRENT_ROOT_INSTALLER is unavailable; using unit-only transition fallback"
+
+# Door 2: AIPC has not staged anything yet.
+if [ ! -d "$SRC" ]; then
+    log "$SRC absent; AIPC package not deployed yet, exiting 0 (OS SSH reachable, not a brick)"
+    exit 0
+fi
+
+shopt -s nullglob
+units=( "$SRC"/*.service "$SRC"/*.timer "$SRC"/*.target )
+if [ "${#units[@]}" -eq 0 ]; then
+    log "$SRC empty; AIPC package not deployed yet, exiting 0 (OS SSH reachable, not a brick)"
+    exit 0
+fi
+
+# Door 3 (in policy): copy + enable only. Never destructive.
+promoted=0
+copied_units=()
+start_units=()
+for unit in "${units[@]}"; do
+    name="$(basename -- "$unit")"
+    if ! cp -f "$unit" "${DEST}/${name}"; then
+        warn "failed to copy $name; skipping"
+        continue
+    fi
+    copied_units+=("$name")
+    promoted=$((promoted + 1))
+done
+
+if [ "$promoted" -gt 0 ] && ! systemctl daemon-reload; then
+    warn "systemctl daemon-reload failed; continuing with best-effort enable"
+fi
+
+for name in "${copied_units[@]}"; do
+    # Idempotent enable: don't re-run enable on units already enabled.
+    if ! systemctl is-enabled --quiet "$name" 2>/dev/null; then
+        systemctl enable "$name" 2>/dev/null || warn "failed to enable $name (will retry next boot)"
+    fi
+    start_units+=("$name")
+done
+
+# Systemd does not dynamically start newly enabled .wants/ dependencies if the
+# target is already active or in the queue. Explicitly queue them now.
+if [ ${#start_units[@]} -gt 0 ]; then
+    systemctl start --no-block "${start_units[@]}" 2>/dev/null || warn "failed to start promoted units"
+fi
+
+log "promoted $promoted unit(s) from $SRC into $DEST"
+exit 0

@@ -1,0 +1,20 @@
+[Unit]
+Description=Promote AIPC units from /data (generic, service-agnostic)
+Documentation=https://example.invalid/aipc-app-bootstrap
+After=local-fs.target
+RequiresMountsFor=/data
+Before=multi-user.target
+# Only act when AIPC has staged units into the shared, slot-agnostic source.
+ConditionPathExists=/data/aipc/systemd/
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/aipc-app-bootstrap
+RemainAfterExit=yes
+StandardOutput=journal+console
+StandardError=journal+console
+SyslogIdentifier=aipc-app-bootstrap
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target
