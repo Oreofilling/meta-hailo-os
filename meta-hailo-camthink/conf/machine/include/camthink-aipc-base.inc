@@ -1,6 +1,8 @@
 # CamThink AIPC Platform Base Configuration
 # This file contains platform-specific configuration for CamThink AIPC
 
+require conf/machine/include/ddr-profile.inc
+
 # Enable systemd as init manager (required for containerd service)
 INIT_MANAGER = "systemd"
 

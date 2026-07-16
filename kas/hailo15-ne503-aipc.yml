@@ -1,6 +1,11 @@
 header:
   version: 11
 
+# DDR: edit DDR_PROFILE below (see meta-hailo-camthink/conf/machine/include/ddr-profile.inc).
+local_conf_header:
+  ddr-profile: |
+    DDR_PROFILE = "mt53e2g32-8g-lp4"
+
 repos:
   meta-virtualization:
     url: "https://git.yoctoproject.org/meta-virtualization"

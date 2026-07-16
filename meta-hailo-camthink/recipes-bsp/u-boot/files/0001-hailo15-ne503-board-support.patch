@@ -15,7 +15,7 @@ new file mode 100644
 index 00000000..c0bbcaad
 --- /dev/null
 +++ b/arch/arm/dts/hailo15-ne503.dts
-@@ -0,0 +1,85 @@
+@@ -0,0 +1,82 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Hailo15 NE503 (based on hailo15-sbc), maintained in meta-hailo-os.
@@ -28,9 +28,6 @@ index 00000000..c0bbcaad
 +
 +&hailo_boot_info {
 +    shutdown-gpio-pin = <20>;
-+    ddr_config {
-+        dram_auto_detect_en = <1>; // Warnning: Applicable only to Hailo15 SBC and must be removed otherwise.
-+    };
 +};
 +
 +&sdio0 {

@@ -1,5 +1,5 @@
 # CamThink AIPC standalone build entry (mirrors meta-hailo-soc kas flow).
-# Usage: kas checkout meta-hailo-os/kas/hailo15-ne503.yml
+# Usage: kas build kas/hailo15-ne503.yml
 build_system: openembedded
 header:
   version: 11
