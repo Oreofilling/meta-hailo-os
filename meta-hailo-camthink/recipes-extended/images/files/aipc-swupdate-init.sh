@@ -76,6 +76,25 @@ mount_persistent_data() {
     mount "$data_partition" /data || recovery_shell "data-mount-failed"
 }
 
+tftp_modes_need_data_mount() {
+    needs_data=1
+    for mode in ${SWUPDATE_UPDATE_MODES//,/ }; do
+        case "$mode" in
+            init-partitions-*)
+                # Factory / bare-board flows resize or format the data
+                # partition. Keep it offline so resize_fs.sh can run e2fsck.
+                return 1
+                ;;
+            copy-a|copy-b)
+                # Online OS rewrites run the AIPC preinstall contract gate,
+                # which validates the persistent release under /data/aipc.
+                needs_data=0
+                ;;
+        esac
+    done
+    return "$needs_data"
+}
+
 safe_forced_reboot() {
     sync
     if awk '$2 == "/data" { found=1 } END { exit !found }' /proc/mounts; then
@@ -141,9 +160,12 @@ run_tftp_update() {
     fi
     /etc/init.d/networking start
     sleep 10
-    # The SWU preinstall gate validates the persistent application contract.
-    # Recovery TFTP mode therefore needs the same /data mount as local mode.
-    mount_persistent_data
+    if tftp_modes_need_data_mount; then
+        console_log "Mounting /data for AIPC online upgrade modes: ${SWUPDATE_UPDATE_MODES}"
+        mount_persistent_data
+    else
+        console_log "Skipping /data mount for TFTP modes: ${SWUPDATE_UPDATE_MODES}"
+    fi
 
     set +e
     (
