@@ -64,29 +64,17 @@ end
 					offset = "0x8000";
 				},
 				{
-					filename = "u-boot.dtb.signed";
-					device = "/dev/${FIRMWARE_DEVICE}";
-					hook = "format_device";
-					offset = "0x40000";
-				},
-				{
 					filename = "customer_certificate.bin";
 					device = "/dev/${FIRMWARE_DEVICE}";
 					hook = "format_device";
 					offset = "0x4F000";
 				},
 				{
-					filename = "u-boot-initial-env.bin";
-					device = "/dev/${FIRMWARE_DEVICE}";
-					hook = "format_device";
-					offset = "0x50000";
-				},
-				{
 					filename = "u-boot-spl.bin";
 					device = "/dev/${FIRMWARE_DEVICE}";
 					hook = "format_device";
 					offset = "0x54000";
-				},
+				}
 			);
 			files: (
 				{
@@ -146,22 +134,10 @@ end
 					offset = "0x80000";
 				},
 				{
-					filename = "u-boot.dtb.signed";
-					device = "/dev/${FIRMWARE_DEVICE}";
-					hook = "format_device";
-					offset = "0xB8000";
-				},
-				{
 					filename = "customer_certificate.bin";
 					device = "/dev/${FIRMWARE_DEVICE}";
 					hook = "format_device";
 					offset = "0xC7000";
-				},
-				{
-					filename = "u-boot-initial-env.bin";
-					device = "/dev/${FIRMWARE_DEVICE}";
-					hook = "format_device";
-					offset = "0xC8000";
 				},
 				{
 					filename = "u-boot-spl.bin";
