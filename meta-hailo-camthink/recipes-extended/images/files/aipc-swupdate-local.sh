@@ -15,6 +15,9 @@ PATH=/sbin:/bin:/usr/sbin:/usr/bin
 RECOVERY_CONSOLE="${RECOVERY_CONSOLE:-/dev/ttyS1}"
 JOB_DIR=""
 LOG_FILE=""
+PERSISTENT_LOG_FILE=""
+TMP_LOG_FILE=""
+TMP_PACKAGE=""
 
 console_log() {
     if [ -n "$LOG_FILE" ]; then
@@ -41,8 +44,11 @@ swupdate_log_filter() {
 
 recovery_shell() {
     reason="$1"
-    if [ -n "$JOB_DIR" ]; then
-        printf '%s\n' "$reason" >"${JOB_DIR}/recovery.failed"
+    if [ -n "$JOB_DIR" ] &&
+        awk '$2 == "/data" { found=1 } END { exit !found }' /proc/mounts; then
+        mkdir -p "$JOB_DIR" 2>/dev/null &&
+            printf '%s\n' "$reason" >"${JOB_DIR}/recovery.failed" 2>/dev/null ||
+            true
     fi
     console_log "Recovery stopped: ${reason}"
     console_log "Starting an emergency shell instead of exiting PID 1."
@@ -87,6 +93,13 @@ mount_persistent_data() {
     mount "$data_partition" /data || recovery_shell "data-mount-failed"
 }
 
+unmount_persistent_data() {
+    if awk '$2 == "/data" { found=1 } END { exit !found }' /proc/mounts; then
+        sync
+        umount /data || recovery_shell "data-unmount-failed"
+    fi
+}
+
 safe_forced_reboot() {
     sync
     if awk '$2 == "/data" { found=1 } END { exit !found }' /proc/mounts; then
@@ -104,6 +117,58 @@ boot_copy_for_mode() {
         *-b) echo "b" ;;
         *) echo "" ;;
     esac
+}
+
+sanitize_mode_for_reason() {
+    local value="$1"
+    printf '%s' "${value//[^A-Za-z0-9_.-]/_}"
+}
+
+validate_local_update_modes() {
+    local modes="$1"
+    local mode=""
+
+    case "$modes" in
+        ""|,*|*,|*,,*|*[!A-Za-z0-9_.,-]*)
+            recovery_shell "invalid-local-update-mode-$(sanitize_mode_for_reason "$modes")"
+            ;;
+    esac
+
+    for mode in ${modes//,/ }; do
+        case "$mode" in
+            ""|*[!A-Za-z0-9_.-]*)
+                recovery_shell "invalid-local-update-mode-$(sanitize_mode_for_reason "$mode")"
+                ;;
+        esac
+    done
+}
+
+mode_list_touches_partitions() {
+    local modes="$1"
+    local mode=""
+
+    for mode in ${modes//,/ }; do
+        case "$mode" in
+            init-partitions-*) return 0 ;;
+        esac
+    done
+    return 1
+}
+
+boot_copy_for_modes() {
+    local modes="$1"
+    local mode=""
+    local mode_copy=""
+    local target_copy=""
+
+    for mode in ${modes//,/ }; do
+        mode_copy="$(boot_copy_for_mode "$mode")"
+        if [ -n "$mode_copy" ]; then
+            target_copy="$mode_copy"
+        fi
+    done
+
+    echo "$target_copy"
 }
 
 select_boot_after_update() {
@@ -133,19 +198,49 @@ select_boot_after_update() {
     fi
 }
 
+persist_tmp_log() {
+    if [ -n "$TMP_LOG_FILE" ] &&
+        [ -f "$TMP_LOG_FILE" ] &&
+        [ -n "$PERSISTENT_LOG_FILE" ]; then
+        mkdir -p "$(dirname "$PERSISTENT_LOG_FILE")" 2>/dev/null &&
+            cat "$TMP_LOG_FILE" >>"$PERSISTENT_LOG_FILE" 2>/dev/null ||
+            true
+    fi
+}
+
+run_swupdate_modes() {
+    local package="$1"
+    local modes="$2"
+    local update_mode=""
+    local rc=0
+
+    for update_mode in ${modes//,/ }; do
+        console_log "*******************************************"
+        console_log ""
+        console_log "Running: swupdate with mode ${update_mode}"
+        console_log ""
+        console_log "*******************************************"
+
+        set +e
+        swupdate -i "$package" -l "${SWUPDATE_LOGLEVEL:-4}" -m -M \
+            -e "stable,${update_mode}" 2>&1 |
+            swupdate_log_filter |
+            tee -a "$LOG_FILE"
+        rc="${PIPESTATUS[0]}"
+        set -e
+        if [ "$rc" -ne 0 ]; then
+            recovery_shell "swupdate-exit-${rc}"
+        fi
+    done
+}
+
 run_local_update() {
-    local_update_mode="${SWUPDATE_UPDATE_MODES:-copy-a}"
-    case "$local_update_mode" in
-        ""|*[!A-Za-z0-9_.-]*)
-            recovery_shell "invalid-local-update-mode-${local_update_mode//[^A-Za-z0-9_.-]/_}"
-            ;;
-        *)
-            # The AIPC application validates that this mode was declared by the
-            # uploaded SWU. Recovery only rejects syntactically unsafe values so
-            # future images can add maintenance/factory update modes without an
-            # AIPC app release.
-            ;;
-    esac
+    local_update_modes="${SWUPDATE_UPDATE_MODES:-copy-a}"
+    # The AIPC application validates that these modes were declared by the
+    # uploaded SWU. Recovery only rejects syntactically unsafe values so future
+    # images can add maintenance/factory update modes without an AIPC app
+    # release.
+    validate_local_update_modes "$local_update_modes"
 
     relative_path="${SWUPDATE_UPDATE_FILENAME#local:}"
     case "$relative_path" in
@@ -159,8 +254,28 @@ run_local_update() {
     mount_persistent_data
     mkdir -p "$JOB_DIR" ||
         recovery_shell "job-directory-failed"
-    LOG_FILE="${JOB_DIR}/swupdate.log"
-    target_copy="$(boot_copy_for_mode "$local_update_mode")"
+    PERSISTENT_LOG_FILE="${JOB_DIR}/swupdate.log"
+    LOG_FILE="$PERSISTENT_LOG_FILE"
+    package_for_swupdate="$package"
+
+    if [ ! -f "$package" ]; then
+        recovery_shell "package-not-found"
+    fi
+
+    if mode_list_touches_partitions "$local_update_modes"; then
+        TMP_PACKAGE="/tmp/$(basename "$package")"
+        TMP_LOG_FILE="/tmp/aipc-swupdate-${job_id}.log"
+        : >"$TMP_LOG_FILE" || recovery_shell "tmp-log-create-failed"
+        console_log "Staging package in RAM before partition update: ${TMP_PACKAGE}"
+        cp "$package" "$TMP_PACKAGE" || recovery_shell "package-stage-failed"
+        sync
+        LOG_FILE="$TMP_LOG_FILE"
+        package_for_swupdate="$TMP_PACKAGE"
+        console_log "Persistent data will be unmounted before partition update"
+        unmount_persistent_data
+    fi
+
+    target_copy="$(boot_copy_for_modes "$local_update_modes")"
     case "$target_copy" in
         a) target_summary="/dev/${filesystem_device}p1 + p2" ;;
         b) target_summary="/dev/${filesystem_device}p3 + p4" ;;
@@ -169,25 +284,24 @@ run_local_update() {
 
     console_log "AIPC local recovery update"
     console_log "Package: ${package}"
-    console_log "Mode:    stable,${local_update_mode}"
+    console_log "Modes:   stable,${local_update_modes}"
     console_log "Target:  ${target_summary}"
 
-    if [ ! -f "$package" ]; then
-        recovery_shell "package-not-found"
+    if [ ! -f "$package_for_swupdate" ]; then
+        recovery_shell "staged-package-not-found"
     fi
 
-    set +e
-    swupdate -i "$package" -l "${SWUPDATE_LOGLEVEL:-4}" -m -M \
-        -e "stable,${local_update_mode}" 2>&1 |
-        swupdate_log_filter |
-        tee -a "$LOG_FILE"
-    rc="${PIPESTATUS[0]}"
-    set -e
-    if [ "$rc" -ne 0 ]; then
-        recovery_shell "swupdate-exit-${rc}"
+    run_swupdate_modes "$package_for_swupdate" "$local_update_modes"
+
+    if [ -n "$TMP_LOG_FILE" ]; then
+        mount_persistent_data
+        mkdir -p "$JOB_DIR" ||
+            recovery_shell "job-directory-failed"
+        persist_tmp_log
+        LOG_FILE="$PERSISTENT_LOG_FILE"
     fi
 
-    select_boot_after_update "$local_update_mode" "$target_copy"
+    select_boot_after_update "$local_update_modes" "$target_copy"
     rm -f "${JOB_DIR}/recovery.failed"
     echo "ok" >"${JOB_DIR}/recovery.success"
     safe_forced_reboot
