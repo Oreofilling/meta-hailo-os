@@ -1,0 +1,62 @@
+bootmenu: only ENTER/ESC/^C abort autoboot delay
+
+Serial noise after Linux reboot was treated as "any key", which stopped
+the bootmenu countdown and left the board stuck waiting for input.
+
+Flush pending RX bytes before the countdown, and ignore non-control
+characters so only ENTER, ESC (incl. arrow keys) and Ctrl+C can abort
+autoboot.
+
+Upstream-Status: Inappropriate [OE-specific]
+
+diff -Naur a/cmd/bootmenu.c b/cmd/bootmenu.c
+--- a/cmd/bootmenu.c
++++ b/cmd/bootmenu.c
+@@ -86,9 +86,13 @@
+ {
+ 	int i, c;
+ 
++	/* Drop leftover/noise RX bytes (common after Linux reboot). */
++	while (tstc())
++		(void)getchar();
++
+ 	if (menu->delay > 0) {
+ 		printf(ANSI_CURSOR_POSITION, menu->count + 5, 1);
+-		printf("  Hit any key to stop autoboot: %2d ", menu->delay);
++		printf("  Hit ENTER/ESC/^C to stop autoboot: %2d ", menu->delay);
+ 	}
+ 
+ 	while (menu->delay > 0) {
+@@ -99,23 +103,29 @@
+ 				continue;
+ 			}
+ 
+-			menu->delay = -1;
+ 			c = getchar();
+ 
++			/*
++			 * Only intentional keys abort the countdown. Ignore
++			 * other serial noise so reboot cannot stick in menu.
++			 */
+ 			switch (c) {
+ 			case '\e':
++				menu->delay = -1;
+ 				*esc = 1;
+ 				*key = KEY_NONE;
+ 				break;
+ 			case '\r':
++				menu->delay = -1;
+ 				*key = KEY_SELECT;
+ 				break;
+ 			case 0x3: /* ^C */
++				menu->delay = -1;
+ 				*key = KEY_QUIT;
+ 				break;
+ 			default:
+-				*key = KEY_NONE;
+-				break;
++				/* consume noise, keep counting down */
++				continue;
+ 			}
+ 
+ 			break;

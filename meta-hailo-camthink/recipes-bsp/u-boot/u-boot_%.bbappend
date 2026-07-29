@@ -6,6 +6,7 @@ SRC_URI:append:hailo15-ne503 = " \
     file://0001-hailo15-ne503-board-support.patch \
     file://0002-hailo15-ne503-fixup-linux-memory-reg.patch \
     file://0003-hailo15-ne503-spiflash-gd25lq64c-support.patch \
+    file://0004-bootmenu-ignore-serial-noise-during-autoboot.patch \
 "
 
 # Inject DDR_DTSI from DDR_PROFILE into hailo15-ne503.dts.
