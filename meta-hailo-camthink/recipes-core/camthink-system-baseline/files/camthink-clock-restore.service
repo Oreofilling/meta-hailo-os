@@ -1,0 +1,15 @@
+[Unit]
+Description=Restore a monotonic wall-clock baseline
+DefaultDependencies=no
+Wants=camthink-data-layout.service
+After=camthink-data-layout.service
+Before=time-set.target systemd-timesyncd.service sysinit.target
+ConditionPathIsMountPoint=/data
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/camthink-clock-state restore
+RemainAfterExit=yes
+
+[Install]
+WantedBy=sysinit.target

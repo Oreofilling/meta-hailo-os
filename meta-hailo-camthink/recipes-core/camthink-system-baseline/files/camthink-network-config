@@ -1,0 +1,16 @@
+#!/bin/sh
+set -eu
+
+source_dir=/data/system/network
+runtime_dir=/run/systemd/network
+
+[ -d "$source_dir" ] || exit 0
+install -d -m 0755 "$runtime_dir"
+
+for suffix in network netdev link; do
+    for source in "$source_dir"/*."$suffix"; do
+        [ -f "$source" ] || continue
+        name=${source##*/}
+        install -m 0644 "$source" "$runtime_dir/$name"
+    done
+done

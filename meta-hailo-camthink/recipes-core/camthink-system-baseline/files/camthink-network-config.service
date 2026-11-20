@@ -1,0 +1,12 @@
+[Unit]
+Description=Load persistent system network configuration
+DefaultDependencies=no
+Wants=camthink-data-layout.service
+After=camthink-data-layout.service
+Before=systemd-networkd.service network-pre.target
+ConditionPathIsMountPoint=/data
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/camthink-network-config
+RemainAfterExit=yes

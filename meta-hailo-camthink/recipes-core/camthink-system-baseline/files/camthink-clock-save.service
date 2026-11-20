@@ -1,0 +1,9 @@
+[Unit]
+Description=Save the last known valid wall-clock value
+RequiresMountsFor=/data
+After=camthink-data-layout.service time-sync.target
+ConditionPathIsMountPoint=/data
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/camthink-clock-state save

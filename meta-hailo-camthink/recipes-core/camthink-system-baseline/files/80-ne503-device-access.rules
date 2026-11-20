@@ -1,0 +1,8 @@
+# Accelerator and DMA devices use the standard video/render access groups.
+KERNEL=="h1x", GROUP="video", MODE="0660"
+KERNEL=="hailo[0-9]*", GROUP="video", MODE="0660"
+SUBSYSTEM=="dma_heap", GROUP="video", MODE="0660"
+SUBSYSTEM=="video4linux", GROUP="video", MODE="0660"
+
+# The board-control UART is not a login console.
+SUBSYSTEM=="tty", KERNEL=="ttyS0", GROUP="dialout", MODE="0660"

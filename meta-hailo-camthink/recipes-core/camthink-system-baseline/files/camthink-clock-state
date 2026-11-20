@@ -1,0 +1,34 @@
+#!/bin/sh
+set -eu
+
+state=/data/system/clock/last-known-epoch
+minimum=1704067200
+maximum=2208988800
+
+case "${1:-}" in
+    restore)
+        [ -r "$state" ] || exit 0
+        saved=$(sed -n '1p' "$state")
+        case "$saved" in
+            ''|*[!0-9]*) exit 0 ;;
+        esac
+        current=$(date +%s)
+        if [ "$saved" -ge "$minimum" ] && [ "$saved" -le "$maximum" ] && \
+           [ "$current" -lt "$saved" ]; then
+            date -u -s "@$saved" >/dev/null
+        fi
+        ;;
+    save)
+        current=$(date +%s)
+        [ "$current" -ge "$minimum" ] || exit 0
+        [ "$current" -le "$maximum" ] || exit 0
+        install -d -m 0755 /data/system/clock
+        printf '%s\n' "$current" >/data/system/clock/.last-known-epoch.tmp
+        chmod 0644 /data/system/clock/.last-known-epoch.tmp
+        mv /data/system/clock/.last-known-epoch.tmp "$state"
+        ;;
+    *)
+        echo "usage: $0 {restore|save}" >&2
+        exit 2
+        ;;
+esac

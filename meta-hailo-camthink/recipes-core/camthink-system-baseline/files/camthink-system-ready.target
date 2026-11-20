@@ -1,0 +1,11 @@
+[Unit]
+Description=System runtime prerequisites
+Requires=camthink-data-layout.service containerd.service docker.service
+Wants=network-online.target systemd-timesyncd.service
+After=systemd-modules-load.service systemd-udev-trigger.service
+After=local-fs.target camthink-clock-restore.service camthink-data-layout.service
+After=var-log.mount network-online.target systemd-timesyncd.service
+After=containerd.service docker.service
+
+[Install]
+WantedBy=multi-user.target
