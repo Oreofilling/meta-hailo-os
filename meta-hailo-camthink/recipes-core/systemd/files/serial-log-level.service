@@ -1,0 +1,13 @@
+[Unit]
+Description=Lower console loglevel to suppress printk noise
+DefaultDependencies=no
+Before=sysinit.target
+After=systemd-journald.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'echo 3 3 3 3 > /proc/sys/kernel/printk'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=sysinit.target multi-user.target

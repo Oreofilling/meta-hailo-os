@@ -5,6 +5,11 @@ header:
 local_conf_header:
   ddr-profile: |
     DDR_PROFILE = "h9hcnnncpumlxr-4g-lp4"
+  persistent-system-logs: |
+    # Keep /var/log as a real rootfs directory. The product fstab bind mounts
+    # it from /data/log so journals and login records survive reboot and A/B
+    # rootfs replacement.
+    VOLATILE_LOG_DIR = "no"
 
 repos:
   meta-virtualization:
