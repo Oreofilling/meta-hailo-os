@@ -1,10 +1,9 @@
 [Unit]
-Description=Promote AIPC units from /data (generic, service-agnostic)
-Documentation=https://example.invalid/aipc-app-bootstrap
-After=local-fs.target
+Description=Install service units from persistent storage
+Requires=camthink-system-ready.target
+After=camthink-system-ready.target
 RequiresMountsFor=/data
 Before=multi-user.target
-# Only act when AIPC has staged units into the shared, slot-agnostic source.
 ConditionPathExists=/data/aipc/systemd/
 
 [Service]

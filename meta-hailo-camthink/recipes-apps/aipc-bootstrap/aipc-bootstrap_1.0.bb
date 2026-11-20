@@ -17,6 +17,11 @@ S = "${WORKDIR}"
 
 inherit systemd
 
+# This recipe installs prebuilt scripts, units and recovery artifacts only.
+# Skipping the default source-tree scans keeps incremental image builds bounded.
+do_configure[noexec] = "1"
+do_compile[noexec] = "1"
+
 # Only the generic enabler is enabled by the OS image. The real AIPC boot units
 # (aipc-restore/firstboot/autostart/os-verify) and their helpers are staged in
 # /data/aipc/systemd by the AIPC package and promoted into this slot at boot by
@@ -27,7 +32,15 @@ SYSTEMD_AUTO_ENABLE:${PN} = "enable"
 
 # fw_printenv/fw_setenv are required by the persistent AIPC OS-upgrade runner
 # to classify copy-a-only devices and stage recovery boot atomically.
-RDEPENDS:${PN} = "bash coreutils gzip tar kmod u-boot-fw-utils"
+RDEPENDS:${PN} = " \
+    bash \
+    coreutils \
+    gzip \
+    tar \
+    kmod \
+    u-boot-fw-utils \
+    camthink-system-baseline \
+"
 
 # Recovery bundle files come from the kernel (fitImage) and swupdate-image
 # recipes. These are only available on incremental rebuilds — clean builds
