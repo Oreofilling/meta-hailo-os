@@ -1,0 +1,14 @@
+#!/bin/sh
+set -eu
+
+[ -d /data/core ] || exit 0
+
+# Remove stale dumps and retain at most the eight newest files. A crash loop
+# must not be able to consume the entire persistent partition.
+find /data/core -maxdepth 1 -type f -name 'core.*' -mtime +7 -delete
+
+ls -1t /data/core/core.* 2>/dev/null | sed -n '9,$p' | while IFS= read -r path; do
+    rm -f -- "$path"
+done
+
+exit 0

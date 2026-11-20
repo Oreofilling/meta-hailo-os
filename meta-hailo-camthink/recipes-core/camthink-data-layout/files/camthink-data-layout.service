@@ -1,0 +1,13 @@
+[Unit]
+Description=Prepare persistent system data directories
+DefaultDependencies=no
+RequiresMountsFor=/data
+After=data.mount
+Before=var-log.mount local-fs.target containerd.service docker.service
+ConditionPathIsMountPoint=/data
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/camthink-data-layout
+RemainAfterExit=yes
+TimeoutStartSec=120

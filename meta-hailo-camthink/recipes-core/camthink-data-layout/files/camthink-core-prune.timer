@@ -1,0 +1,11 @@
+[Unit]
+Description=Periodic persistent core-dump retention
+
+[Timer]
+OnBootSec=15min
+OnUnitActiveSec=1d
+Persistent=true
+Unit=camthink-core-prune.service
+
+[Install]
+WantedBy=timers.target

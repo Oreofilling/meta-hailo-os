@@ -1,0 +1,9 @@
+[Unit]
+Description=Prune persistent process core dumps
+Requires=camthink-data-layout.service
+After=camthink-data-layout.service
+ConditionPathIsDirectory=/data/core
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/camthink-core-prune

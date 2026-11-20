@@ -1,2 +1,9 @@
 PARTLABEL=data  /data  ext4  defaults,nofail,x-systemd.device-timeout=10s  0  2
 
+# Keep system logs on the persistent data partition. The preparation unit is
+# static and is pulled in only when this mount is part of the boot transaction.
+/data/log  /var/log  none  bind,nofail,x-systemd.requires=camthink-data-layout.service  0  0
+
+# /var/lock points at /run/lock. Mounting a dedicated tmpfs guarantees the
+# target exists even on images where systemd-tmpfiles-setup is not enabled.
+tmpfs  /run/lock  tmpfs  mode=1777,nosuid,nodev,noexec,nofail  0  0

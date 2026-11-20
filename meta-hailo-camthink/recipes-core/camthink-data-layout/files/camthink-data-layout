@@ -1,0 +1,42 @@
+#!/bin/sh
+set -eu
+
+mountpoint -q /data || exit 0
+
+# Migrate directories that older images used. All paths are on the same ext4
+# filesystem, so rename is atomic and does not duplicate large state trees.
+install -d -m 0755 /data/log
+
+if [ -d /data/journal ] && [ ! -e /data/log/journal ]; then
+    mv /data/journal /data/log/journal
+fi
+
+for name in wtmp lastlog; do
+    old="/data/aipc-data/log/${name}"
+    new="/data/log/${name}"
+    if [ -f "$old" ] && [ ! -e "$new" ]; then
+        mv "$old" "$new"
+    fi
+done
+
+if [ -d /data/aipc-data/containerd ] && [ ! -e /data/containerd ]; then
+    mv /data/aipc-data/containerd /data/containerd
+fi
+
+install -d -m 2755 -o root -g systemd-journal /data/log/journal
+install -d -m 1777 -o root -g root /data/core
+install -d -m 0711 -o root -g root /data/containerd /data/docker
+install -d -m 0755 -o root -g root \
+    /data/system /data/system/clock /data/system/network
+
+for name in wtmp lastlog; do
+    path="/data/log/${name}"
+    if [ ! -e "$path" ]; then
+        : >"$path"
+    fi
+    chown root:utmp "$path"
+    chmod 0664 "$path"
+done
+
+printf '%s\n' 2 >/data/.system-layout-version.tmp
+mv /data/.system-layout-version.tmp /data/.system-layout-version

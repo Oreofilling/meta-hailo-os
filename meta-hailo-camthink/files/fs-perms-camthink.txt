@@ -1,0 +1,3 @@
+# Product override for the persistent-log permission table. /var/tmp remains a
+# real sticky directory instead of a link into /var/volatile.
+${localstatedir}/tmp  01777  root  root  false  -  -  -
