@@ -1,5 +1,5 @@
-SUMMARY = "CamThink AIPC Platform Package Group"
-DESCRIPTION = "Package group for CamThink AIPC platform including system dependencies and application"
+SUMMARY = "Compatibility package group for the dynamic application payload"
+DESCRIPTION = "Retains the previous package-group name while depending on the product OS baseline and application bootstrap."
 
 PACKAGE_ARCH = "${MACHINE_ARCH}"
 BUILDHISTORY_FEATURES:remove = "image package"
@@ -9,34 +9,18 @@ inherit packagegroup
 PACKAGEGROUP_DISABLE_COMPLEMENTARY = "1"
 PACKAGES = "${PN} ${PN}-system ${PN}-app"
 
-# Part 1: System dependencies (binaries and libraries required by the system)
-# These are system-level packages needed for the platform to function
+# Compatibility system set. New images include packagegroup-camthink-system
+# directly so OS dependencies do not depend on an application package name.
 RDEPENDS:${PN}-system = " \
-    containerd-opencontainers \
-    runc-opencontainers \
-    cni \
-    docker \
-    python3-docker-compose \
-    factory-eeprom-tool \
-    u-boot-fw-utils \
+    packagegroup-camthink-system \
     aipc-bootstrap \
-    quectel-cm \
-    quectel-qlog \
-    camthink-rootfs \
-    libavcodec \
-    libavutil \
-    libswresample \
-    run-swupdate-script \
-    swupdate \
-    tzdata \
 "
 
-# Part 2: CamThink AIPC application
-# The actual application package (currently empty, add camthink-aipc when ready)
-# Example: RDEPENDS:${PN}-app = " camthink-aipc"
+# Optional dynamic application payload. It remains empty because the payload
+# is installed independently of the replaceable root filesystem.
 RDEPENDS:${PN}-app = ""
 
-# Main package group includes both system and application
+# Preserve the dependency shape expected by older image configurations.
 RDEPENDS:${PN} = " \
     ${PN}-system \
     ${PN}-app \

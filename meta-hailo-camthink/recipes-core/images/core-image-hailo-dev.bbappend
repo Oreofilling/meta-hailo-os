@@ -1,5 +1,5 @@
-# CamThink AIPC: Install packagegroup for system dependencies and application
-# System dependencies (containerd, runc, cni) are now managed through packagegroup
+# Product OS baseline plus the slot-independent application bootstrap contract.
 IMAGE_INSTALL:append = " \
-    packagegroup-camthink-aipc \
+    packagegroup-camthink-system \
+    aipc-bootstrap \
 "
