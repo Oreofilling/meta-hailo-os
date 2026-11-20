@@ -170,7 +170,7 @@ new file mode 100644
 index 0000000..2afa8c8
 --- /dev/null
 +++ b/include/configs/hailo15-ne503.h
-@@ -0,0 +1,33 @@
+@@ -0,0 +1,34 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +/*
 + * Copyright (c) 2019-2023 Hailo Technologies Ltd. All rights reserved.  
@@ -182,6 +182,7 @@ index 0000000..2afa8c8
 +#define __HAILO15_NE503_H
 +
 +/* Kernel cmdline append: passed as default bootargs_board_options in hailo1x_common.h */
++#define BOOTARGS_BASE "console=ttyS1,${baudrate}n8 earlycon loglevel=3 rootwait"
 +#define BOARD_EXTRA_BOOTARGS "systemd.unified_cgroup_hierarchy=1"
 +#define SWUPDATE_MMC_INDEX "1"
 +#ifndef SPL_BOOT_SOURCE
